@@ -59,13 +59,13 @@ struct ContentView: View {
     @State private var doneItems: [TodayItem] = []
     
     private var addButton: some View {
-        VStack(spacing: 8) {
-            // Add Button
-            Button(action: {
+        Button(
+            action: {
                 newItemForegroundColor = colorScheme == .dark ? .white : .black
                 newItemBackgroundColor = colorScheme == .dark ? .black : .white
                 isAdding = true
-            }, label: {
+            },
+            label: {
                 Text("Add Item")
                     
                     .frame(maxWidth: .infinity,
@@ -74,40 +74,42 @@ struct ContentView: View {
                     .background(Color.primary)
                     .cornerRadius(8)
                     .padding(4)
-            })
-        }
+            }
+        )
     }
     
     private var todayItems: some View {
         ForEach(items.sorted(by: { $0.epoch > $1.epoch }), id: \.self) { item in
-            Button(action: {
-                if let index = doneItems.firstIndex(where: { $0.id == item.id }) {
-                    doneItems.remove(at: index)
-                } else {
-                    doneItems.append(item)
-                }
-            }, label: {
-                Text(item.todo)
-                    .padding()
-                    .frame(maxWidth: .infinity,
-                           minHeight: 44, maxHeight: 120,
-                           alignment: .center)
-                    .foregroundColor(doneItems.contains(item) ? Color.red : item.foregroundColor.color)
-                    .background(doneItems.contains(item) ? Color.clear : item.backgroundColor.color)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(
-                                style: StrokeStyle(
-                                    lineWidth: 2,
-                                    dash: [6]
+            Button(
+                action: {
+                    if let index = doneItems.firstIndex(where: { $0.id == item.id }) {
+                        doneItems.remove(at: index)
+                    } else {
+                        doneItems.append(item)
+                    }
+                },
+                label: {
+                    Text(item.todo)
+                        .padding()
+                        .frame(maxWidth: .infinity,
+                               minHeight: 44, maxHeight: 120,
+                               alignment: .center)
+                        .foregroundColor(doneItems.contains(item) ? Color.red : item.foregroundColor.color)
+                        .background(doneItems.contains(item) ? Color.clear : item.backgroundColor.color)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(
+                                    style: StrokeStyle(
+                                        lineWidth: 2,
+                                        dash: [6]
+                                    )
                                 )
-                            )
-                            .foregroundColor(doneItems.contains(item) ? Color.primary : Color.clear)
-                    )
-                    .cornerRadius(8)
-                    .padding(4)
-            })
-            
+                                .foregroundColor(doneItems.contains(item) ? Color.primary : Color.clear)
+                        )
+                        .cornerRadius(8)
+                        .padding(4)
+                }
+            )
         }
     }
     
@@ -123,13 +125,16 @@ struct ContentView: View {
                 }
                 .padding()
                 .toolbar {
-                    Button(action: {
-                        if let item = items.sorted(by: { $0.epoch > $1.epoch }).last {
-                            scrollViewReader.scrollTo(item, anchor: .bottom)
+                    Button(
+                        action: {
+                            if let item = items.sorted(by: { $0.epoch > $1.epoch }).last {
+                                scrollViewReader.scrollTo(item, anchor: .bottom)
+                            }
+                        },
+                        label: {
+                            Image(systemName: "arrow.down.circle")
                         }
-                    }, label: {
-                        Image(systemName: "arrow.down.circle")
-                    })
+                    )
                 }
             }
             .navigationBarTitle("Today: \(items.count)")
