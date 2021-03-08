@@ -1,9 +1,9 @@
 # Gallery Images
 
-![primary](media/primary-example.png)
+![primary](https://github.com/0xLeif/TodayStack/blob/main/.media/primary-example.png?raw=true)
 
-![secondary](media/secondary-example.jpg)
+![secondary](https://github.com/0xLeif/TodayStack/blob/main/.media/secondary-example.jpg?raw=true)
 
-![short-list](media/short-list-example.jpg)
+![short-list](https://github.com/0xLeif/TodayStack/blob/main/.media/short-list-example.jpg?raw=true)
 
-![adding](media/adding-example.jpg)
+![adding](https://github.com/0xLeif/TodayStack/blob/main/.media/adding-example.jpg?raw=true)
