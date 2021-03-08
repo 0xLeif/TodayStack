@@ -13,12 +13,12 @@ struct CodableColor: Codable, Hashable {
     var blue: CGFloat
     var alpha: CGFloat?
     
-    var uiColor: UIColor {
-        UIColor(red: red, green: green, blue: blue, alpha: alpha ?? 1)
+    var cgColor: CGColor {
+        CGColor(red: red, green: green, blue: blue, alpha: alpha ?? 1)
     }
     
     var color: Color {
-        Color(uiColor)
+        Color(cgColor)
     }
     
     init(color: Color) {
@@ -39,6 +39,7 @@ struct CodableColor: Codable, Hashable {
 struct TodayItem: Identifiable, Hashable, Codable {
     var id: UUID = UUID()
     var epoch: Date = Date()
+    var completionEpoch: Date?
     
     var todo: String
     var foregroundColor: CodableColor
@@ -58,6 +59,22 @@ struct ContentView: View {
     
     @State private var doneItems: [TodayItem] = []
     
+    private let oneDay: TimeInterval = 60 * 60 * 24
+    private var itemsByDays: [Int: [TodayItem]] {
+        items.sorted(by: { $0.epoch > $1.epoch })
+            .reduce([Int: [TodayItem]]()) { (itemsByDays, item) in
+                var items = itemsByDays
+                let numberOfDaysAgo = Int(abs(Date().timeIntervalSince1970 - item.epoch.timeIntervalSince1970) / oneDay)
+                guard var itemsForDay = items[numberOfDaysAgo] else {
+                    items[numberOfDaysAgo] = [item]
+                    return items
+                }
+                itemsForDay.append(item)
+                items[numberOfDaysAgo] = itemsForDay
+                return items
+            }
+    }
+    
     private var addButton: some View {
         Button(
             action: {
@@ -66,91 +83,98 @@ struct ContentView: View {
                 isAdding = true
             },
             label: {
-                Text("Add Item")
-                    
+                Label("Add Item", systemImage: "plus")
+                    .font(.title3)
                     .frame(maxWidth: .infinity,
                            minHeight: 44, maxHeight: 44,
                            alignment: .center)
-                    .background(Color.primary)
+                    .foregroundColor(colorScheme == .dark ? .blue : .white)
+                    .background(colorScheme == .dark ? Color.white : Color.blue)
                     .cornerRadius(8)
                     .padding(4)
             }
         )
     }
     
-    private var todayItems: some View {
-        ForEach(items.sorted(by: { $0.epoch > $1.epoch }), id: \.self) { item in
-            Button(
-                action: {
-                    if let index = doneItems.firstIndex(where: { $0.id == item.id }) {
-                        doneItems.remove(at: index)
-                    } else {
-                        doneItems.append(item)
+    private var allItems: some View {
+        let itemsByDays = self.itemsByDays
+        return ForEach(itemsByDays.keys.sorted(by: <), id: \.self) { daysAgo in
+            if let dayItems = itemsByDays[daysAgo] {
+                if daysAgo == 0 {
+                    ForEach(dayItems, id: \.self) { item in
+                        itemView(item: item)
                     }
-                },
-                label: {
-                    Text(item.todo)
-                        .padding()
-                        .frame(maxWidth: .infinity,
-                               minHeight: 44, maxHeight: 120,
-                               alignment: .center)
-                        .foregroundColor(doneItems.contains(item) ? Color.red : item.foregroundColor.color)
-                        .background(doneItems.contains(item) ? Color.clear : item.backgroundColor.color)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .strokeBorder(
-                                    style: StrokeStyle(
-                                        lineWidth: 2,
-                                        dash: [6]
-                                    )
-                                )
-                                .foregroundColor(doneItems.contains(item) ? Color.primary : Color.clear)
-                        )
-                        .cornerRadius(8)
-                        .padding(4)
+                } else {
+                    Section(header: Text("\(daysAgo) \(daysAgo == 1 ? "Day" : "Days") ago: \(dayItems.count)")) {
+                        ForEach(dayItems, id: \.self) { item in
+                            itemView(item: item)
+                        }
+                    }
                 }
-            )
+            }
         }
     }
     
-    var body: some View {
-        ScrollViewReader { scrollViewReader in
-            ScrollView {
-                VStack(spacing: 8) {
-                    // Add Button
-                    addButton
-                    
-                    // Items
-                    todayItems
+    private func itemView(item: TodayItem) -> some View {
+        Button(
+            action: {
+                if let index = doneItems.firstIndex(where: { $0.id == item.id }) {
+                    doneItems.remove(at: index)
+                } else {
+                    doneItems.append(item)
                 }
-                .padding()
-                .toolbar {
-                    Button(
-                        action: {
-                            if let item = items.sorted(by: { $0.epoch > $1.epoch }).last {
-                                scrollViewReader.scrollTo(item, anchor: .bottom)
-                            }
-                        },
-                        label: {
-                            Image(systemName: "arrow.down.circle")
-                        }
+            },
+            label: {
+                Text(item.todo)
+                    .padding()
+                    .frame(maxWidth: .infinity,
+                           minHeight: 44, maxHeight: 120,
+                           alignment: .center)
+                    .foregroundColor(doneItems.contains(item) ? Color.red : item.foregroundColor.color)
+                    .background(doneItems.contains(item) ? Color.clear : item.backgroundColor.color)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(
+                                style: StrokeStyle(
+                                    lineWidth: 2,
+                                    dash: [6]
+                                )
+                            )
+                            .foregroundColor(doneItems.contains(item) ? Color.primary : Color.clear)
                     )
-                }
+                    .cornerRadius(8)
+                    .padding(4)
             }
-            .navigationBarTitle("Today: \(items.count)")
-            .onAppear {
-                load()
+        )
+    }
+    
+    var body: some View {
+        List {
+            addButton
+            allItems
+        }
+        .listStyle(PlainListStyle())
+        .navigationBarTitle("Today: \(itemsByDays[0]?.count ?? 0)")
+        .onAppear {
+            load()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            print("Application willResignActiveNotification")
+            items.removeAll { (item) -> Bool in
+                doneItems.contains(item)
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-                print("Application willResignActiveNotification")
-                items.removeAll { (item) -> Bool in
-                    doneItems.contains(item)
-                }
-                save()
-            }
-            .sheet(isPresented: $isAdding) {
-                VStack {
+            save()
+        }
+        .sheet(isPresented: $isAdding) {
+            ScrollView {
+                VStack(spacing: 16) {
                     HStack {
+                        Button("Cancel") {
+                            isAdding = false
+                            newItemTodo = ""
+                            newItemForegroundColor = colorScheme == .dark ? .white : .black
+                            newItemBackgroundColor = colorScheme == .dark ? .black : .white
+                        }
                         Spacer()
                         Button("Add") {
                             guard !newItemTodo.isEmpty else {
@@ -172,7 +196,20 @@ struct ContentView: View {
                         }
                         .padding()
                     }
-                    TextField("Todo", text: $newItemTodo)
+                    TextEditor(text: $newItemTodo)
+                        .padding()
+                        .frame(height: 120, alignment: .center)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(
+                                    style: StrokeStyle(
+                                        lineWidth: 2,
+                                        dash: [6]
+                                    )
+                                )
+                                .foregroundColor(Color.blue)
+                        )
+                        .cornerRadius(8)
                     ColorPicker("Foreground Color", selection: $newItemForegroundColor)
                     ColorPicker("Background Color", selection: $newItemBackgroundColor)
                     Spacer()
