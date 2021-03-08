@@ -49,7 +49,6 @@ struct TodayItem: Identifiable, Hashable, Codable {
 struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     
-    @State private var isDeletingAll = false
     @State private var isAdding = false
     @State private var newItemTodo: String = ""
     @State private var newItemForegroundColor: Color = .clear
