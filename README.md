@@ -2,7 +2,7 @@
 
 TodayStack is an Open Source todo app to get things done.
 
-<img float="left" src=".media/todayStackIcon.png" width="256">
+<img float="left" src="media/todayStackIcon.png" width="256">
 
 ## [Gallery](GALLERY.md)
 
