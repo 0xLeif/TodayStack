@@ -46,17 +46,45 @@ struct TodayItem: Identifiable, Hashable, Codable {
     var backgroundColor: CodableColor
 }
 
+extension TodayItem {
+    static func item(
+        title: String,
+        epochOffset: TimeInterval,
+        completionEpochOffset: TimeInterval?
+    ) -> TodayItem {
+        TodayItem(
+            id: UUID(),
+            epoch: Date().addingTimeInterval(epochOffset),
+            completionEpoch: completionEpochOffset.map { Date().addingTimeInterval($0) },
+            todo: title,
+            foregroundColor: .init(color: .black),
+            backgroundColor: .init(color: .white)
+        )
+    }
+}
+
 struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     
+    @State private var isShowingRollup = false
     @State private var isAdding = false
     @State private var newItemTodo: String = ""
     @State private var newItemForegroundColor: Color = .clear
     @State private var newItemBackgroundColor: Color = .clear
     
-    @State private var items: [TodayItem] = []
-    
-    @State private var doneItems: [TodayItem] = []
+    @State private var items: [TodayItem] = {
+        let uncompleted: [TodayItem] = stride(from: 1, to: 10, by: 1).map { day in
+            .item(title: "New", epochOffset: 60 * 60 * 24 * day, completionEpochOffset: nil)
+        }
+        let completed: [TodayItem] = stride(from: 1, to: 10, by: 1).map { day in
+            .item(title: "Completed", epochOffset: 60 * 60 * 24 * day, completionEpochOffset: 60 * 60 * 30 * -1)
+        }
+        let completedOld: [TodayItem] = stride(from: 1, to: 100, by: 1).map { day in
+            .item(title: "Old", epochOffset: 60 * 60 * 24 * day, completionEpochOffset: 60 * 60 * 30 * -10)
+        }
+        
+        return completed + uncompleted + completedOld
+    }()
     
     private let oneDay: TimeInterval = 60 * 60 * 24
     private var itemsByDays: [Int: [TodayItem]] {
@@ -72,6 +100,17 @@ struct ContentView: View {
                 items[numberOfDaysAgo] = itemsForDay
                 return items
             }
+    }
+    private func itemsCompleted(from: Date, to: Date) -> [TodayItem] {
+        itemsByDays.flatMap { _, items in
+            items.filter { item in
+                guard let completionEpoch = item.completionEpoch else {
+                    return false
+                }
+                
+                return from.timeIntervalSince1970 < completionEpoch.timeIntervalSince1970 && completionEpoch.timeIntervalSince1970 < to.timeIntervalSince1970
+            }
+        }
     }
     
     private var addButton: some View {
@@ -95,10 +134,9 @@ struct ContentView: View {
         )
     }
     
-    private var allItems: some View {
-        let itemsByDays = self.itemsByDays
-        return ForEach(itemsByDays.keys.sorted(by: <), id: \.self) { daysAgo in
-            if let dayItems = itemsByDays[daysAgo] {
+    private func all(items: [Int : [TodayItem]]) -> some View {
+        return ForEach(items.keys.sorted(by: <), id: \.self) { daysAgo in
+            if let dayItems = items[daysAgo] {
                 if daysAgo == 0 {
                     ForEach(dayItems, id: \.self) { item in
                         itemView(item: item)
@@ -117,10 +155,13 @@ struct ContentView: View {
     private func itemView(item: TodayItem) -> some View {
         Button(
             action: {
-                if let index = doneItems.firstIndex(where: { $0.id == item.id }) {
-                    doneItems.remove(at: index)
+                guard let index = items.firstIndex(where: { $0.id == item.id }) else {
+                    return
+                }
+                if item.completionEpoch != nil {
+                    items[index].completionEpoch = nil
                 } else {
-                    doneItems.append(item)
+                    items[index].completionEpoch = Date()
                 }
             },
             label: {
@@ -129,8 +170,8 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity,
                            minHeight: 44, maxHeight: 120,
                            alignment: .center)
-                    .foregroundColor(doneItems.contains(item) ? Color.red : item.foregroundColor.color)
-                    .background(doneItems.contains(item) ? Color.clear : item.backgroundColor.color)
+                    .foregroundColor((item.completionEpoch != nil) ? Color.red : item.foregroundColor.color)
+                    .background((item.completionEpoch != nil) ? Color.clear : item.backgroundColor.color)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .strokeBorder(
@@ -139,7 +180,7 @@ struct ContentView: View {
                                     dash: [6]
                                 )
                             )
-                            .foregroundColor(doneItems.contains(item) ? Color.primary : Color.clear)
+                            .foregroundColor((item.completionEpoch != nil) ? Color.primary : Color.clear)
                     )
                     .cornerRadius(8)
                     .padding(4)
@@ -148,19 +189,45 @@ struct ContentView: View {
     }
     
     var body: some View {
-        List {
+        let itemsByDays = self.itemsByDays
+        
+        return List {
             addButton
-            allItems
+            all(items: itemsByDays)
         }
         .listStyle(PlainListStyle())
         .navigationBarTitle("Today: \(itemsByDays[0]?.count ?? 0)")
-        .onAppear {
-            load()
+        .toolbar {
+            Button(
+                action: {
+                    isShowingRollup = true
+                },
+                label: {
+                    Image(systemName: "scroll")
+                }
+            )
+            .sheet(isPresented: $isShowingRollup) {
+                List {
+                    Text("Today: \(itemsCompleted(from: Date().addingTimeInterval(-oneDay), to: Date()).count)").font(.largeTitle)
+                    all(items: [
+                        0: itemsCompleted(from: Date().addingTimeInterval(-oneDay), to: Date()),
+                        1: itemsCompleted(from: Date().addingTimeInterval(-oneDay * 2), to: Date().addingTimeInterval(-oneDay))
+                    ])
+                    .disabled(true)
+                }
+            }
         }
+        //        .onAppear {
+        //            load()
+        //        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             print("Application willResignActiveNotification")
             items.removeAll { (item) -> Bool in
-                doneItems.contains(item)
+                guard let completionEpoch = item.completionEpoch else {
+                    return false
+                }
+                
+                return completionEpoch.timeIntervalSince1970 < Date().addingTimeInterval(60 * 60 * 24 * -2).timeIntervalSince1970
             }
             save()
         }
