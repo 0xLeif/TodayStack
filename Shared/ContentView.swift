@@ -66,26 +66,22 @@ extension TodayItem {
 struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     
+    @State private var shouldShowCompletedItems = true
     @State private var isShowingRollup = false
     @State private var isAdding = false
     @State private var newItemTodo: String = ""
     @State private var newItemForegroundColor: Color = .clear
     @State private var newItemBackgroundColor: Color = .clear
     
-    @State private var items: [TodayItem] = {
-        let uncompleted: [TodayItem] = stride(from: 1, to: 10, by: 1).map { day in
-            .item(title: "New", epochOffset: 60 * 60 * 24 * day, completionEpochOffset: nil)
-        }
-        let completed: [TodayItem] = stride(from: 1, to: 10, by: 1).map { day in
-            .item(title: "Completed", epochOffset: 60 * 60 * 24 * day, completionEpochOffset: 60 * 60 * 30 * -1)
-        }
-        let completedOld: [TodayItem] = stride(from: 1, to: 100, by: 1).map { day in
-            .item(title: "Old", epochOffset: 60 * 60 * 24 * day, completionEpochOffset: 60 * 60 * 30 * -10)
-        }
-        
-        return completed + uncompleted + completedOld
-    }()
+    @State private var items: [TodayItem] = []
     
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        
+        formatter.dateStyle = .short
+        
+        return formatter
+    }()
     private let oneDay: TimeInterval = 60 * 60 * 24
     private var itemsByDays: [Int: [TodayItem]] {
         items.sorted(by: { $0.epoch > $1.epoch })
@@ -134,14 +130,51 @@ struct ContentView: View {
         )
     }
     
+    private func todayItemsView(items: [TodayItem]) -> some View {
+        Group {
+            ForEach(items.filter({ $0.completionEpoch == nil }), id: \.self) { item in
+                itemView(item: item)
+            }
+            Section(header: Text("Completed: \(itemsCompleted(from: Date().addingTimeInterval(-oneDay), to: Date()).count)")) {
+                ForEach(itemsCompleted(from: Date().addingTimeInterval(-oneDay), to: Date()), id: \.self) { item in
+                    itemView(item: item)
+                }
+            }
+        }
+    }
+    
+    private func yesterdayItemsView(items: [TodayItem]) -> some View {
+        Group {
+            Text("Yesterday: \(items.count)")
+                .font(.largeTitle)
+                .bold()
+                .padding(.top, 32)
+            Section(header: Text("Tasks: \(items.filter({ $0.completionEpoch == nil }).count)")) {
+                ForEach(items.filter({ $0.completionEpoch == nil }), id: \.self) { item in
+                    itemView(item: item)
+                }
+            }
+            Section(header: Text("Completed: \(itemsCompleted(from: Date().addingTimeInterval(-oneDay * 2), to: Date().addingTimeInterval(-oneDay)).count)")) {
+                ForEach(itemsCompleted(from: Date().addingTimeInterval(-oneDay * 2), to: Date().addingTimeInterval(-oneDay)), id: \.self) { item in
+                    itemView(item: item)
+                }
+            }
+        }
+    }
+    
     private func all(items: [Int : [TodayItem]]) -> some View {
         return ForEach(items.keys.sorted(by: <), id: \.self) { daysAgo in
             if let dayItems = items[daysAgo] {
-                if daysAgo == 0 {
-                    ForEach(dayItems, id: \.self) { item in
-                        itemView(item: item)
-                    }
-                } else {
+                switch daysAgo {
+                case 0:
+                    todayItemsView(items: dayItems)
+                case 1:
+                    yesterdayItemsView(items: dayItems)
+                default:
+                    Text(dateFormatter.string(from: Date().addingTimeInterval(oneDay * Double(-daysAgo))))
+                        .font(.largeTitle)
+                        .bold()
+                        .padding(.top, 32)
                     Section(header: Text("\(daysAgo) \(daysAgo == 1 ? "Day" : "Days") ago: \(dayItems.count)")) {
                         ForEach(dayItems, id: \.self) { item in
                             itemView(item: item)
@@ -197,29 +230,9 @@ struct ContentView: View {
         }
         .listStyle(PlainListStyle())
         .navigationBarTitle("Today: \(itemsByDays[0]?.count ?? 0)")
-        .toolbar {
-            Button(
-                action: {
-                    isShowingRollup = true
-                },
-                label: {
-                    Image(systemName: "scroll")
-                }
-            )
-            .sheet(isPresented: $isShowingRollup) {
-                List {
-                    Text("Today: \(itemsCompleted(from: Date().addingTimeInterval(-oneDay), to: Date()).count)").font(.largeTitle)
-                    all(items: [
-                        0: itemsCompleted(from: Date().addingTimeInterval(-oneDay), to: Date()),
-                        1: itemsCompleted(from: Date().addingTimeInterval(-oneDay * 2), to: Date().addingTimeInterval(-oneDay))
-                    ])
-                    .disabled(true)
-                }
-            }
+        .onAppear {
+            load()
         }
-        //        .onAppear {
-        //            load()
-        //        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             print("Application willResignActiveNotification")
             items.removeAll { (item) -> Bool in
@@ -286,20 +299,20 @@ struct ContentView: View {
     }
     
     private func save() {
-        DispatchQueue.main.async {
-            if let data = try? JSONEncoder().encode(items) {
-                UserDefaults.standard.set(data, forKey: "TodayItems")
-            }
-        }
+        //        DispatchQueue.main.async {
+        //            if let data = try? JSONEncoder().encode(items) {
+        //                UserDefaults.standard.set(data, forKey: "TodayItems")
+        //            }
+        //        }
     }
     
     private func load() {
-        DispatchQueue.main.async {
-            if let data = UserDefaults.standard.data(forKey: "TodayItems"),
-               let items = try? JSONDecoder().decode([TodayItem].self, from: data) {
-                self.items = items
-            }
-        }
+        //        DispatchQueue.main.async {
+        //            if let data = UserDefaults.standard.data(forKey: "TodayItems"),
+        //               let items = try? JSONDecoder().decode([TodayItem].self, from: data) {
+        //                self.items = items
+        //            }
+        //        }
     }
 }
 
