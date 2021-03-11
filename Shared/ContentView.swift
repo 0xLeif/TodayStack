@@ -299,20 +299,20 @@ struct ContentView: View {
     }
     
     private func save() {
-        //        DispatchQueue.main.async {
-        //            if let data = try? JSONEncoder().encode(items) {
-        //                UserDefaults.standard.set(data, forKey: "TodayItems")
-        //            }
-        //        }
+        DispatchQueue.main.async {
+            if let data = try? JSONEncoder().encode(items) {
+                UserDefaults.standard.set(data, forKey: "TodayItems")
+            }
+        }
     }
     
     private func load() {
-        //        DispatchQueue.main.async {
-        //            if let data = UserDefaults.standard.data(forKey: "TodayItems"),
-        //               let items = try? JSONDecoder().decode([TodayItem].self, from: data) {
-        //                self.items = items
-        //            }
-        //        }
+        DispatchQueue.main.async {
+            if let data = UserDefaults.standard.data(forKey: "TodayItems"),
+               let items = try? JSONDecoder().decode([TodayItem].self, from: data) {
+                self.items = items
+            }
+        }
     }
 }
 
