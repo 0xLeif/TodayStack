@@ -163,21 +163,34 @@ struct ContentView: View {
     }
     
     private func all(items: [Int : [TodayItem]]) -> some View {
-        return ForEach(items.keys.sorted(by: <), id: \.self) { daysAgo in
-            if let dayItems = items[daysAgo] {
-                switch daysAgo {
-                case 0:
-                    todayItemsView(items: dayItems)
-                case 1:
-                    yesterdayItemsView(items: dayItems)
-                default:
-                    Text(dateFormatter.string(from: Date().addingTimeInterval(oneDay * Double(-daysAgo))))
-                        .font(.largeTitle)
-                        .bold()
-                        .padding(.top, 32)
-                    Section(header: Text("\(daysAgo) \(daysAgo == 1 ? "Day" : "Days") ago: \(dayItems.count)")) {
-                        ForEach(dayItems, id: \.self) { item in
-                            itemView(item: item)
+        return Group {
+            
+            todayItemsView(items: items[0] ?? [])
+            yesterdayItemsView(items: items[1] ?? [])
+            
+            
+            ForEach(items.keys.sorted(by: <), id: \.self) { daysAgo in
+                if daysAgo == 0 {
+                    
+                } else if daysAgo == 1 {
+                    
+                } else {
+                    if let dayItems = items[daysAgo] {
+                        switch daysAgo {
+                        case 0:
+                            todayItemsView(items: dayItems)
+                        case 1:
+                            yesterdayItemsView(items: dayItems)
+                        default:
+                            Text(dateFormatter.string(from: Date().addingTimeInterval(oneDay * Double(-daysAgo))))
+                                .font(.largeTitle)
+                                .bold()
+                                .padding(.top, 32)
+                            Section(header: Text("\(daysAgo) \(daysAgo == 1 ? "Day" : "Days") ago: \(dayItems.count)")) {
+                                ForEach(dayItems, id: \.self) { item in
+                                    itemView(item: item)
+                                }
+                            }
                         }
                     }
                 }
